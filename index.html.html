@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestor de Campeonato de Rally</title>
+
+  <!-- Librería para exportar a PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-color: #f8fafc;
+      --accent-color: #38bdf8;
+      --accent-hover: #0284c7;
+      --gold: #f59e0b;
+      --danger: #ef4444;
+      --border: #334155;
+      --success: #10b981;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1, h2, h3, h4 { color: var(--accent-color); margin-top: 0; }
+
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tabs button {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text-color);
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .nav-tabs button.active {
+      background-color: var(--accent-color);
+      color: #0f172a;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    input, select, button {
+      padding: 10px;
+      background-color: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text-color);
+      border-radius: 4px;
+    }
+
+    button {
+      background-color: var(--accent-color);
+      color: #0f172a;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+    }
+
+    button:hover { background-color: var(--accent-hover); }
+    button.btn-danger { background-color: var(--danger); color: white; }
+    button.btn-pdf { background-color: var(--success); color: white; }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9em;
+    }
+
+    th { background-color: #0f172a; color: var(--accent-color); white-space: nowrap; }
+
+    .tabla-compacta th, .tabla-compacta td {
+      padding: 5px 4px;
+      font-size: 0.78em;
+      text-align: center;
+    }
+
+    .tabla-compacta th:nth-child(2), .tabla-compacta td:nth-child(2) {
+      text-align: left;
+    }
+
+    .tabla-stats th, .tabla-stats td {
+      text-align: center;
+    }
+    .tabla-stats th:first-child, .tabla-stats td:first-child {
+      text-align: left;
+    }
+
+    .badge-cat {
+      background: var(--border);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-weight: bold;
+    }
+
+    .badge-flag {
+      background: #334155;
+      color: #f8fafc;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 0.8em;
+      font-weight: bold;
+      margin-right: 4px;
+    }
+
+    .etapa-inputs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 8px;
+    }
+
+    .etapa-card {
+      background: #0f172a;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .etapa-card.is-sunday { border-color: var(--gold); }
+    .etapa-card.is-ps { border-color: var(--accent-color); }
+    .etapa-card.is-disabled { opacity: 0.4; pointer-events: none; }
+
+    .etapa-card label {
+      font-size: 0.75em;
+      color: #94a3b8;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .etapa-card input {
+      width: 100%;
+      padding: 5px;
+      font-size: 0.85em;
+      text-align: center;
+      box-sizing: border-box;
+      font-family: monospace;
+    }
+
+    .etapa-card select {
+      width: 100%;
+      padding: 4px;
+      font-size: 0.7em;
+      margin-top: 4px;
+      box-sizing: border-box;
+    }
+
+    .pts-highlight { color: var(--gold); font-weight: bold; }
+
+    .pdf-export-container {
+      background-color: #1e293b;
+      color: #f8fafc;
+      padding: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .grid-campeones {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .card-campeon {
+      background: #0f172a;
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .grid-pts-config {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .grid-pts-config div {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.8em;
+    }
+
+    .grid-pts-config input {
+      padding: 4px;
+      text-align: center;
+    }
+
+    .alert-box {
+      background: #0f172a;
+      border: 1px solid var(--gold);
+      padding: 12px;
+      border-radius: 6px;
+      color: var(--gold);
+      font-size: 0.9em;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>🏆 Sistema de Gestión de Rally & Campeonato</h1>
+
+    <div class="nav-tabs">
+      <button class="active" onclick="cambiarTab('pilotos')">👥 Pilotos</button>
+      <button onclick="cambiarTab('rallies')">🗺️ Rallies</button>
+      <button onclick="cambiarTab('temporadas')">📅 Temporadas</button>
+      <button onclick="cambiarTab('config')">⚙️ Configuración Puntajes/Penalidades</button>
+      <button onclick="cambiarTab('carrera')">🏎️ Cargar Rally</button>
+      <button onclick="cambiarTab('campeonato')">📊 Tabla Campeonato</button>
+      <button onclick="cambiarTab('stats')">📈 Historial - Stats</button>
+    </div>
+
+    <!-- 1. PILOTOS -->
+    <div id="tab-pilotos" class="tab-content active">
+      <div class="card">
+        <h2>Gestión de Pilotos</h2>
+        <div class="form-group">
+          <input type="text" id="nombrePiloto" placeholder="Nombre del Piloto">
+          <input type="text" id="paisPiloto" placeholder="País (Ej: ARG)" style="width: 100px;">
+          <select id="catPiloto">
+            <option value="WRC">WRC</option>
+            <option value="WRC2">WRC2</option>
+            <option value="WRC3">WRC3</option>
+          </select>
+          <button onclick="guardarPiloto()">Agregar Piloto</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Piloto</th>
+              <th>País</th>
+              <th>Categoría</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="listaPilotos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2. RALLIES -->
+    <div id="tab-rallies" class="tab-content">
+      <div class="card">
+        <h2>Catálogo de Rallies</h2>
+        <div class="form-group">
+          <input type="text" id="nombreRally" placeholder="Ej: Rally Montecarlo">
+          <button onclick="guardarRally()">Agregar Rally</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Rally</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="listaRallies"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 3. TEMPORADAS -->
+    <div id="tab-temporadas" class="tab-content">
+      <div class="card">
+        <h2>Crear Nueva Temporada</h2>
+        <div class="form-group">
+          <input type="text" id="nombreTemporada" placeholder="Ej: Temporada 2026">
+        </div>
+        <h3>Selecciona los Rallies de esta Temporada (Máximo 16):</h3>
+        <div id="checkboxesRallies" style="margin-bottom: 15px;"></div>
+        <button onclick="crearTemporada()">Crear Temporada</button>
+      </div>
+
+      <div class="card">
+        <h2>Temporadas Creadas</h2>
+        <div id="listaTemporadas"></div>
+      </div>
+    </div>
+
+    <!-- 4. CONFIGURACIÓN DE PUNTAJES Y PENALIDADES -->
+    <div id="tab-config" class="tab-content">
+      <div class="card">
+        <h2>⚙️ Configuración de Puntajes y Penalidades por Temporada</h2>
+        <div class="form-group">
+          <label><strong>Seleccionar Temporada a Configurar:</strong></label>
+          <select id="selectTempConfig" onchange="cargarConfiguracionTemporada()">
+            <option value="">-- Selecciona Temporada --</option>
+          </select>
+        </div>
+
+        <div id="bloqueBloqueoConfig" class="alert-box" style="display:none; border-color: var(--danger); color: var(--danger);">
+          🔒 <strong>Temporada en Curso / Finalizada:</strong> Ya se han procesado resultados de rallies para esta temporada. La configuración de puntajes y penalidades no se puede modificar.
+        </div>
+
+        <div id="contenedorAjustesConfig" style="display:none;">
+          <div class="card" style="background:#0f172a;">
+            <h3>1. Sistema de Puntajes</h3>
+            <div class="form-group">
+              <label>Modo de Puntaje:</label>
+              <select id="selectTipoPuntaje" onchange="toggleModoPuntaje()">
+                <option value="WRC">Puntaje Actual WRC (Default)</option>
+                <option value="CUSTOM">Nuevo Puntaje (Personalizado)</option>
+              </select>
+            </div>
+
+            <div id="areaNuevoPuntaje" style="display:none;">
+              <h4>Puntos Overall (Máximo 30 posiciones)</h4>
+              <div id="inputsOverallPts" class="grid-pts-config"></div>
+
+              <h4 style="margin-top:15px;">Puntos Super Sunday (Máximo 10 posiciones)</h4>
+              <div id="inputsSundayPts" class="grid-pts-config"></div>
+
+              <h4 style="margin-top:15px;">Puntos Power Stage (Máximo 10 posiciones)</h4>
+              <div id="inputsPowerStagePts" class="grid-pts-config"></div>
+            </div>
+          </div>
+
+          <div class="card" style="background:#0f172a;">
+            <h3>2. Reglas de Penalización</h3>
+
+            <div style="margin-bottom: 15px;">
+              <h4>Penalización 1</h4>
+              <div class="form-group">
+                <select id="pen1Base">
+                  <option value="PEOR">Peor Tiempo</option>
+                  <option value="REAL">Tiempo Real (requiere ingresar tiempo)</option>
+                </select>
+                <span>+</span>
+                <select id="pen1Minutos">
+                  <option value="1">1 Minuto</option>
+                  <option value="2">2 Minutos</option>
+                  <option value="3">3 Minutos</option>
+                  <option value="4">4 Minutos</option>
+                  <option value="5">5 Minutos</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <h4>Penalización 2</h4>
+              <div class="form-group">
+                <select id="pen2Base">
+                  <option value="PEOR">Peor Tiempo</option>
+                  <option value="REAL">Tiempo Real (requiere ingresar tiempo)</option>
+                </select>
+                <span>+</span>
+                <select id="pen2Minutos">
+                  <option value="2">2 Minutos</option>
+                  <option value="1">1 Minuto</option>
+                  <option value="3">3 Minutos</option>
+                  <option value="4">4 Minutos</option>
+                  <option value="5">5 Minutos</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <h4>Campo Vacío (Si la etapa se disputó)</h4>
+              <div class="form-group">
+                <select id="penVacioTipo">
+                  <option value="PEOR5">Peor Tiempo + 5:00 min</option>
+                  <option value="DNF">DNF (Abandono del Rally)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <button id="btnGuardarConfig" onclick="guardarConfiguracionTemporada()">Guardar Configuración para la Temporada</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. CARGA DE RALLIES Y TIEMPOS -->
+    <div id="tab-carrera" class="tab-content">
+      <div class="card">
+        <h2>Seleccionar Rally a Disputar / Consultar</h2>
+        <div class="form-group">
+          <select id="selectTemporadaCarrera" onchange="actualizarRalliesCarrera()">
+            <option value="">-- Selecciona Temporada --</option>
+          </select>
+          <select id="selectRallyCarrera" onchange="cargarFormularioCargaRally()">
+            <option value="">-- Selecciona Rally --</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="contenedorCargaRally" class="card" style="display:none;">
+        <h3 id="tituloRallySeleccionado"></h3>
+        
+        <div class="form-group" style="background: #0f172a; padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
+          <div>
+            <label style="font-size:0.85em; color:#94a3b8; display:block;">Total Etapas (Máx 24):</label>
+            <input type="number" id="cantEtapasTotal" min="2" max="24" value="12" style="width: 80px;" onchange="ajustarConfiguracionEtapas()">
+          </div>
+          <div>
+            <label style="font-size:0.85em; color:#94a3b8; display:block;">Etapas Super Sunday:</label>
+            <input type="number" id="cantEtapasSunday" min="1" max="23" value="3" style="width: 80px;" onchange="ajustarConfiguracionEtapas()">
+          </div>
+          <div style="font-size: 0.8em; color: #94a3b8; margin-left: 10px;">
+            ℹ️ <span id="infoEtapasDetalle"></span>
+          </div>
+        </div>
+
+        <div class="form-group" style="background: #0f172a; padding: 10px; border-radius: 6px;">
+          <label><strong>Inscribir participante a este Rally:</strong></label>
+          <select id="selectAgregarPilotoRally"></select>
+          <button onclick="agregarPilotoARally()">➕ Inscribir</button>
+        </div>
+
+        <div id="leyendaReglasAplicadas" style="font-size: 0.85em; color: #94a3b8; margin-bottom: 10px; background:#0f172a; padding:10px; border-radius:4px;"></div>
+        
+        <div id="inputsTiemposPilotos"></div>
+
+        <button style="margin-top: 15px; width: 100%;" onclick="procesarRally()">Calcular y Guardar Resultados del Rally</button>
+      </div>
+
+      <!-- RESULTADOS DEL RALLY -->
+      <div id="contenedorResultadosRally" class="card" style="display:none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h2>Resultados Finales del Rally</h2>
+          <button class="btn-pdf" onclick="exportarPDF('areaExportarRally', 'Resultados_Rally')">📄 Exportar PDF</button>
+        </div>
+        
+        <div id="areaExportarRally" class="pdf-export-container table-container">
+          <h3 id="pdfTituloRally" style="margin-bottom: 10px;"></h3>
+          <table id="tablaResultadosRally">
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Piloto</th>
+                <th>Clase</th>
+                <th>Overall</th>
+                <th>Diff</th>
+                <th>Super Sunday</th>
+                <th>Overall</th>
+                <th>Sunday</th>
+                <th>Power Stage</th>
+                <th>Total Pts</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. TABLA GENERAL DEL CAMPEONATO -->
+    <div id="tab-campeonato" class="tab-content">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+          <h2>Tabla General de Campeonato</h2>
+          <button class="btn-pdf" onclick="exportarPDF('areaExportarCampeonato', 'Tabla_Campeonato')">📄 Exportar PDF</button>
+        </div>
+
+        <div class="form-group">
+          <select id="selectTempCampeonato" onchange="renderizarCampeonato()">
+            <option value="">-- Selecciona Temporada --</option>
+          </select>
+          <select id="selectCatCampeonato" onchange="renderizarCampeonato()">
+            <option value="ALL">General (Todas las Clases)</option>
+            <option value="WRC">WRC</option>
+            <option value="WRC2">WRC2</option>
+            <option value="WRC3">WRC3</option>
+          </select>
+        </div>
+
+        <div id="areaExportarCampeonato" class="pdf-export-container table-container">
+          <h3 id="pdfTituloCampeonato" style="margin-bottom: 10px; font-size: 1.1em;"></h3>
+          <table id="tablaCampeonatoEstructura" class="tabla-compacta">
+            <thead id="theadCampeonato"></thead>
+            <tbody id="tablaCampeonato"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. HISTORIAL - STATS -->
+    <div id="tab-stats" class="tab-content">
+      <div class="card">
+        <h2>👑 Palmarés de Campeones (Temporadas Finalizadas)</h2>
+        <div id="contenedorCampeones" class="grid-campeones"></div>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+          <h2>📈 Estadísticas Históricas Acumuladas</h2>
+          
+          <div class="form-group" style="margin-bottom:0;">
+            <div>
+              <label style="font-size:0.8em; color:#94a3b8; display:block;">Clase:</label>
+              <select id="selectCatStats" onchange="renderizarEstadisticas()">
+                <option value="ALL">Todas las Categorías</option>
+                <option value="WRC">WRC</option>
+                <option value="WRC2">WRC2</option>
+                <option value="WRC3">WRC3</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="font-size:0.8em; color:#94a3b8; display:block;">Ordenar por:</label>
+              <select id="selectOrdenStats" onchange="renderizarEstadisticas()">
+                <option value="titulos">👑 Títulos</option>
+                <option value="ralliesGanados">🥇 Rallies Ganados</option>
+                <option value="etapasGanadas">⏱️ Etapas Ganadas</option>
+                <option value="sundayGanados">☀️ Super Sunday</option>
+                <option value="powerStageGanadas">⚡ Power Stage</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="tabla-stats">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Piloto</th>
+                <th>Clase</th>
+                <th>👑 Títulos</th>
+                <th>🥇 Rallies Ganados</th>
+                <th>⏱️ Etapas Ganadas</th>
+                <th>☀️ Super Sunday</th>
+                <th>⚡ Power Stage</th>
+              </tr>
+            </thead>
+            <tbody id="tablaEstadisticas"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const DEFAULT_PTS_OVERALL = [25, 17, 15, 12, 10, 8, 6, 4, 2, 1];
+    const DEFAULT_PTS_SUPER_SUNDAY = [5, 4, 3, 2, 1];
+    const DEFAULT_PTS_POWER_STAGE = [5, 4, 3, 2, 1];
+
+    let db = {
+      pilotos: JSON.parse(localStorage.getItem('rally_pilotos')) || [],
+      rallies: JSON.parse(localStorage.getItem('rally_rallies')) || [],
+      temporadas: JSON.parse(localStorage.getItem('rally_temporadas')) || {},
+      resultados: JSON.parse(localStorage.getItem('rally_resultados')) || {},
+      inscritos: JSON.parse(localStorage.getItem('rally_inscritos')) || {},
+      configEtapas: JSON.parse(localStorage.getItem('rally_configEtapas')) || {},
+      configTemporadas: JSON.parse(localStorage.getItem('rally_configTemporadas')) || {}
+    };
+
+    function getConfigTemporadaOrDefault(temp) {
+      if (db.configTemporadas && db.configTemporadas[temp]) {
+        return db.configTemporadas[temp];
+      }
+      return {
+        tipoPuntaje: 'WRC',
+        ptsOverall: [...DEFAULT_PTS_OVERALL],
+        ptsSunday: [...DEFAULT_PTS_SUPER_SUNDAY],
+        ptsPowerStage: [...DEFAULT_PTS_POWER_STAGE],
+        pen1Base: 'PEOR',
+        pen1Minutos: 1,
+        pen2Base: 'PEOR',
+        pen2Minutos: 2,
+        penVacioTipo: 'PEOR5'
+      };
+    }
+
+    function ordenarPilotosPorClase() {
+      const ordenClase = { "WRC": 1, "WRC2": 2, "WRC3": 3 };
+      db.pilotos.sort((a, b) => {
+        const catA = ordenClase[a.categoria] || 99;
+        const catB = ordenClase[b.categoria] || 99;
+        if (catA !== catB) return catA - catB;
+        return a.nombre.localeCompare(b.nombre);
+      });
+    }
+
+    function guardarDB() {
+      ordenarPilotosPorClase();
+      localStorage.setItem('rally_pilotos', JSON.stringify(db.pilotos));
+      localStorage.setItem('rally_rallies', JSON.stringify(db.rallies));
+      localStorage.setItem('rally_temporadas', JSON.stringify(db.temporadas));
+      localStorage.setItem('rally_resultados', JSON.stringify(db.resultados));
+      localStorage.setItem('rally_inscritos', JSON.stringify(db.inscritos));
+      localStorage.setItem('rally_configEtapas', JSON.stringify(db.configEtapas));
+      localStorage.setItem('rally_configTemporadas', JSON.stringify(db.configTemporadas));
+    }
+
+    function cambiarTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tabs button').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(`tab-${tabId}`).classList.add('active');
+      event.target.classList.add('active');
+
+      if (tabId === 'pilotos') renderizarPilotos();
+      if (tabId === 'temporadas') renderizarFormularioTemporadas();
+      if (tabId === 'config') actualizarSelectsConfig();
+      if (tabId === 'carrera') actualizarSelectsCarrera();
+      if (tabId === 'campeonato') actualizarSelectsCampeonato();
+      if (tabId === 'stats') renderizarEstadisticas();
+    }
+
+    // MÁSCARA AUTOMÁTICA STRICTA AL INGRESAR EXACTAMENTE 7 DÍGITOS
+    function aplicarMascaraTiempo(input) {
+      let digits = input.value.replace(/\D/g, '');
+      
+      if (digits.length < 7) {
+        input.value = digits;
+      } else {
+        digits = digits.substring(0, 7);
+        input.value = `${digits.substring(0, 2)}:${digits.substring(2, 4)}.${digits.substring(4, 7)}`;
+      }
+    }
+
+    // --- PILOTOS ---
+    function guardarPiloto() {
+      const nombre = document.getElementById('nombrePiloto').value.trim();
+      const pais = document.getElementById('paisPiloto').value.trim().toUpperCase() || 'N/A';
+      const categoria = document.getElementById('catPiloto').value;
+
+      if (!nombre) return alert("Ingresa un nombre.");
+      
+      db.pilotos.push({ id: Date.now(), nombre, pais, categoria });
+      guardarDB();
+      
+      document.getElementById('nombrePiloto').value = "";
+      document.getElementById('paisPiloto').value = "";
+      renderizarPilotos();
+    }
+
+    function eliminarPiloto(id) {
+      db.pilotos = db.pilotos.filter(p => p.id !== id);
+      guardarDB();
+      renderizarPilotos();
+    }
+
+    function renderizarPilotos() {
+      ordenarPilotosPorClase();
+      const tbody = document.getElementById('listaPilotos');
+      tbody.innerHTML = db.pilotos.map(p => `
+        <tr>
+          <td>${p.nombre}</td>
+          <td><span class="badge-flag">${p.pais}</span></td>
+          <td><span class="badge-cat">${p.categoria}</span></td>
+          <td><button class="btn-danger" onclick="eliminarPiloto(${p.id})">Eliminar</button></td>
+        </tr>
+      `).join('');
+    }
+
+    // --- RALLIES ---
+    function guardarRally() {
+      const nombre = document.getElementById('nombreRally').value.trim();
+      if (!nombre) return alert("Ingresa un nombre para el Rally.");
+
+      db.rallies.push({ id: Date.now(), nombre });
+      document.getElementById('nombreRally').value = "";
+      guardarDB();
+      renderizarRallies();
+    }
+
+    function eliminarRally(id) {
+      db.rallies = db.rallies.filter(r => r.id !== id);
+      guardarDB();
+      renderizarRallies();
+    }
+
+    function renderizarRallies() {
+      const tbody = document.getElementById('listaRallies');
+      tbody.innerHTML = db.rallies.map(r => `
+        <tr>
+          <td>${r.nombre}</td>
+          <td><button class="btn-danger" onclick="eliminarRally(${r.id})">Eliminar</button></td>
+        </tr>
+      `).join('');
+    }
+
+    // --- TEMPORADAS ---
+    function renderizarFormularioTemporadas() {
+      const container = document.getElementById('checkboxesRallies');
+      if (db.rallies.length === 0) {
+        container.innerHTML = "<p>Primero debes agregar rallies en el catálogo.</p>";
+        return;
+      }
+
+      container.innerHTML = db.rallies.map(r => `
+        <label style="display:block; margin-bottom: 5px;">
+          <input type="checkbox" value="${r.nombre}" class="chk-rally" onchange="validarLimiteRallies(this)"> ${r.nombre}
+        </label>
+      `).join('');
+
+      const divLista = document.getElementById('listaTemporadas');
+      divLista.innerHTML = Object.keys(db.temporadas).map(temp => `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">
+          <div><strong>${temp}</strong> (${db.temporadas[temp].join(', ')})</div>
+          <button class="btn-danger" onclick="eliminarTemporada('${temp}')">Eliminar Temporada</button>
+        </div>
+      `).join('');
+    }
+
+    function validarLimiteRallies(chk) {
+      const seleccionados = document.querySelectorAll('.chk-rally:checked');
+      if (seleccionados.length > 16) {
+        alert("El máximo posible de rallies por temporada es de 16.");
+        chk.checked = false;
+      }
+    }
+
+    function crearTemporada() {
+      const nombre = document.getElementById('nombreTemporada').value.trim();
+      const checkboxes = document.querySelectorAll('.chk-rally:checked');
+      
+      if (!nombre) return alert("Ingresa un nombre para la temporada.");
+      if (checkboxes.length === 0) return alert("Selecciona al menos un Rally.");
+      if (checkboxes.length > 16) return alert("Una temporada no puede tener más de 16 Rallies.");
+
+      const ralliesSeleccionados = Array.from(checkboxes).map(c => c.value);
+      db.temporadas[nombre] = ralliesSeleccionados;
+      
+      // Asignar configuración por defecto al crear temporada
+      db.configTemporadas[nombre] = getConfigTemporadaOrDefault(nombre);
+
+      document.getElementById('nombreTemporada').value = "";
+      guardarDB();
+      renderizarFormularioTemporadas();
+
+      alert(`¡Temporada "${nombre}" creada con éxito!\n\nDe desearlo, recuerda configurar los Puntajes y Penalidades en la pestaña correspondiente ANTES de cargar resultados, ya que no podrán modificarse una vez iniciada la temporada.`);
+    }
+
+    function eliminarTemporada(nombreTemp) {
+      if (confirm(`¿Seguro que deseas eliminar la temporada ${nombreTemp}?`)) {
+        delete db.temporadas[nombreTemp];
+        delete db.configTemporadas[nombreTemp];
+        
+        Object.keys(db.resultados).forEach(k => { if (k.startsWith(`${nombreTemp}_`)) delete db.resultados[k]; });
+        Object.keys(db.inscritos).forEach(k => { if (k.startsWith(`${nombreTemp}_`)) delete db.inscritos[k]; });
+        Object.keys(db.configEtapas).forEach(k => { if (k.startsWith(`${nombreTemp}_`)) delete db.configEtapas[k]; });
+
+        guardarDB();
+        renderizarFormularioTemporadas();
+        
+        actualizarSelectsCarrera();
+        actualizarSelectsCampeonato();
+        actualizarSelectsConfig();
+        renderizarEstadisticas();
+      }
+    }
+
+    // --- CONFIGURACIÓN DE PUNTAJES Y PENALIDADES ---
+    function actualizarSelectsConfig() {
+      const select = document.getElementById('selectTempConfig');
+      select.innerHTML = '<option value="">-- Selecciona Temporada --</option>' + 
+        Object.keys(db.temporadas).map(t => `<option value="${t}">${t}</option>`).join('');
+      document.getElementById('contenedorAjustesConfig').style.display = "none";
+      document.getElementById('bloqueBloqueoConfig').style.display = "none";
+    }
+
+    function temporadaTieneResultados(temp) {
+      return Object.keys(db.resultados).some(key => key.startsWith(`${temp}_`) && db.resultados[key] && db.resultados[key].length > 0);
+    }
+
+    function generarGridInputs(containerId, cantidad, valoresDefault) {
+      const container = document.getElementById(containerId);
+      let html = '';
+      for (let i = 1; i <= cantidad; i++) {
+        const val = (valoresDefault && valoresDefault[i - 1] !== undefined) ? valoresDefault[i - 1] : 0;
+        html += `
+          <div>
+            <label>${i}° Pos:</label>
+            <input type="number" min="0" id="${containerId}_pos_${i}" value="${val}">
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function cargarConfiguracionTemporada() {
+      const temp = document.getElementById('selectTempConfig').value;
+      const contenedor = document.getElementById('contenedorAjustesConfig');
+      const bloqueo = document.getElementById('bloqueBloqueoConfig');
+
+      if (!temp) {
+        contenedor.style.display = "none";
+        bloqueo.style.display = "none";
+        return;
+      }
+
+      const esBloqueado = temporadaTieneResultados(temp);
+      const cfg = getConfigTemporadaOrDefault(temp);
+
+      document.getElementById('selectTipoPuntaje').value = cfg.tipoPuntaje;
+      document.getElementById('pen1Base').value = cfg.pen1Base;
+      document.getElementById('pen1Minutos').value = cfg.pen1Minutos;
+      document.getElementById('pen2Base').value = cfg.pen2Base;
+      document.getElementById('pen2Minutos').value = cfg.pen2Minutos;
+      document.getElementById('penVacioTipo').value = cfg.penVacioTipo;
+
+      generarGridInputs('inputsOverallPts', 30, cfg.ptsOverall);
+      generarGridInputs('inputsSundayPts', 10, cfg.ptsSunday);
+      generarGridInputs('inputsPowerStagePts', 10, cfg.ptsPowerStage);
+
+      toggleModoPuntaje();
+
+      contenedor.style.display = "block";
+
+      if (esBloqueado) {
+        bloqueo.style.display = "block";
+        document.getElementById('btnGuardarConfig').style.display = "none";
+        document.querySelectorAll('#contenedorAjustesConfig input, #contenedorAjustesConfig select').forEach(el => el.disabled = true);
+      } else {
+        bloqueo.style.display = "none";
+        document.getElementById('btnGuardarConfig').style.display = "block";
+        document.querySelectorAll('#contenedorAjustesConfig input, #contenedorAjustesConfig select').forEach(el => el.disabled = false);
+      }
+    }
+
+    function toggleModoPuntaje() {
+      const modo = document.getElementById('selectTipoPuntaje').value;
+      const areaCustom = document.getElementById('areaNuevoPuntaje');
+      areaCustom.style.display = (modo === 'CUSTOM') ? 'block' : 'none';
+    }
+
+    function obtenerValoresGrid(containerId, cantidad) {
+      let arr = [];
+      for (let i = 1; i <= cantidad; i++) {
+        const val = parseInt(document.getElementById(`${containerId}_pos_${i}`).value) || 0;
+        arr.push(val);
+      }
+      return arr;
+    }
+
+    function guardarConfiguracionTemporada() {
+      const temp = document.getElementById('selectTempConfig').value;
+      if (!temp) return;
+
+      if (temporadaTieneResultados(temp)) {
+        return alert("Esta temporada ya tiene resultados cargados. No se pueden modificar las reglas.");
+      }
+
+      const tipoPuntaje = document.getElementById('selectTipoPuntaje').value;
+      let ptsOverall = [...DEFAULT_PTS_OVERALL];
+      let ptsSunday = [...DEFAULT_PTS_SUPER_SUNDAY];
+      let ptsPowerStage = [...DEFAULT_PTS_POWER_STAGE];
+
+      if (tipoPuntaje === 'CUSTOM') {
+        ptsOverall = obtenerValoresGrid('inputsOverallPts', 30);
+        ptsSunday = obtenerValoresGrid('inputsSundayPts', 10);
+        ptsPowerStage = obtenerValoresGrid('inputsPowerStagePts', 10);
+      }
+
+      db.configTemporadas[temp] = {
+        tipoPuntaje,
+        ptsOverall,
+        ptsSunday,
+        ptsPowerStage,
+        pen1Base: document.getElementById('pen1Base').value,
+        pen1Minutos: parseInt(document.getElementById('pen1Minutos').value),
+        pen2Base: document.getElementById('pen2Base').value,
+        pen2Minutos: parseInt(document.getElementById('pen2Minutos').value),
+        penVacioTipo: document.getElementById('penVacioTipo').value
+      };
+
+      guardarDB();
+      alert(`Configuración guardada exitosamente para la temporada "${temp}".`);
+    }
+
+    // --- CARGA DE RALLIES Y TIEMPOS ---
+    function actualizarSelectsCarrera() {
+      const selectTemp = document.getElementById('selectTemporadaCarrera');
+      selectTemp.innerHTML = '<option value="">-- Selecciona Temporada --</option>' + 
+        Object.keys(db.temporadas).map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+
+    function actualizarRalliesCarrera() {
+      const temp = document.getElementById('selectTemporadaCarrera').value;
+      const selectRally = document.getElementById('selectRallyCarrera');
+      
+      if (!temp) {
+        selectRally.innerHTML = '<option value="">-- Selecciona Rally --</option>';
+        return;
+      }
+
+      selectRally.innerHTML = '<option value="">-- Selecciona Rally --</option>' + 
+        (db.temporadas[temp] ? db.temporadas[temp].map(r => `<option value="${r}">${r}</option>`).join('') : '');
+    }
+
+    function cargarFormularioCargaRally() {
+      const temp = document.getElementById('selectTemporadaCarrera').value;
+      const rally = document.getElementById('selectRallyCarrera').value;
+      const contenedor = document.getElementById('contenedorCargaRally');
+
+      if (!temp || !rally) {
+        contenedor.style.display = "none";
+        document.getElementById('contenedorResultadosRally').style.display = "none";
+        return;
+      }
+
+      const keyRally = `${temp}_${rally}`;
+      document.getElementById('tituloRallySeleccionado').innerText = `${rally} (${temp})`;
+      document.getElementById('pdfTituloRally').innerText = `Resultados - ${rally} (${temp})`;
+      contenedor.style.display = "block";
+
+      const cfgEtapas = db.configEtapas[keyRally] || { total: 12, sunday: 3 };
+      document.getElementById('cantEtapasTotal').value = cfgEtapas.total;
+      document.getElementById('cantEtapasSunday').value = cfgEtapas.sunday;
+
+      const cfgRules = getConfigTemporadaOrDefault(temp);
+      const textPen1 = `<strong>Penalización 1:</strong> ${cfgRules.pen1Base === 'PEOR' ? 'Peor Tiempo' : 'Tiempo Real'} + ${cfgRules.pen1Minutos}:00 min.`;
+      const textPen2 = `<strong>Penalización 2:</strong> ${cfgRules.pen2Base === 'PEOR' ? 'Peor Tiempo' : 'Tiempo Real'} + ${cfgRules.pen2Minutos}:00 min.`;
+      const textVacio = `<strong>Campo Vacío:</strong> ${cfgRules.penVacioTipo === 'PEOR5' ? 'Peor tiempo + 5:00 min' : 'DNF (Abandono)'}`;
+      const textPts = `<strong>Puntajes:</strong> ${cfgRules.tipoPuntaje === 'WRC' ? 'Actual WRC Standard' : 'Personalizado'}`;
+
+      document.getElementById('leyendaReglasAplicadas').innerHTML = `⚙️ <strong>Reglas Aplicadas (${temp}):</strong> ${textPts} | ${textPen1} | ${textPen2} | ${textVacio}`;
+
+      ajustarConfiguracionEtapas(false);
+      actualizarSelectorAgregarPiloto(keyRally);
+      renderizarInputsPilotosInscritos(keyRally);
+
+      const resultadoPrevio = db.resultados[keyRally];
+      if (resultadoPrevio && resultadoPrevio.length > 0) {
+        renderizarResultadosRally(resultadoPrevio, temp);
+      } else {
+        document.getElementById('contenedorResultadosRally').style.display = "none";
+      }
+    }
+
+    function ajustarConfiguracionEtapas(render = true) {
+      const temp = document.getElementById('selectTemporadaCarrera').value;
+      const rally = document.getElementById('selectRallyCarrera').value;
+      if (!temp || !rally) return;
+
+      let total = parseInt(document.getElementById('cantEtapasTotal').value) || 2;
+      if (total < 2) total = 2;
+      if (total > 24) total = 24;
+      document.getElementById('cantEtapasTotal').value = total;
+
+      let sunday = parseInt(document.getElementById('cantEtapasSunday').value) || 1;
+      if (sunday >= total) sunday = total - 1;
+      if (sunday < 1) sunday = 1;
+      document.getElementById('cantEtapasSunday').value = sunday;
+
+      const psIndex = total;
+      const sundayStart = total - sunday;
+      const sundayEnd = total - 1;
+
+      let infoText = `SS1 a SS${sundayStart - 1}: Regular | `;
+      if (sundayStart === sundayEnd) {
+        infoText += `SS${sundayStart}: Super Sunday | `;
+      } else {
+        infoText += `SS${sundayStart} a SS${sundayEnd}: Super Sunday | `;
+      }
+      infoText += `SS${psIndex}: Power Stage`;
+
+      document.getElementById('infoEtapasDetalle').innerText = infoText;
+
+      const keyRally = `${temp}_${rally}`;
+      db.configEtapas[keyRally] = { total, sunday };
+      guardarDB();
+
+      if (render) renderizarInputsPilotosInscritos(keyRally);
+    }
+
+    function actualizarSelectorAgregarPiloto(keyInscritos) {
+      ordenarPilotosPorClase();
+      const inscritosIds = db.inscritos[keyInscritos] || [];
+      const select = document.getElementById('selectAgregarPilotoRally');
+      
+      const noInscritos = db.pilotos.filter(p => !inscritosIds.includes(p.id));
+
+      if (noInscritos.length === 0) {
+        select.innerHTML = '<option value="">-- Todos están inscriptos --</option>';
+      } else {
+        select.innerHTML = '<option value="">-- Selecciona Piloto --</option>' +
+          '<option value="ALL">➕ Añadir Todos</option>' +
+          noInscritos.map(p => `<option value="${p.id}">[${p.categoria}] ${p.nombre} (${p.pais})</option>`).join('');
+      }
+    }
+
+    function agregarPilotoARally() {
+      const temp = document.getElementById('selectTemporadaCarrera').value;
+      const rally = document.getElementById('selectRallyCarrera').value;
+      const valSelected = document.getElementById('selectAgregarPilotoRally').value;
+
+      if (!valSelected) return alert("Selecciona una opción válida.");
+
+      const keyInscritos = `${temp}_${rally}`;
+      if (!db.inscritos[keyInscritos]) db.inscritos[keyInscritos] = [];
+
+      if (valSelected === "ALL") {
+        db.pilotos.forEach(p => {
+          if (!db.inscritos[keyInscritos].includes(p.id)) {
+            db.inscritos[keyInscritos].push(p.id);
+          }
+        });
+      } else {
+        const pilotoId = parseInt(valSelected);
+        if (!db.inscritos[keyInscritos].includes(pilotoId)) {
+          db.inscritos[keyInscritos].push(pilotoId);
+        }
+      }
+
+      guardarDB();
+      cargarFormularioCargaRally();
+    }
+
+    function removerPilotoDeRally(pilotoId) {
+      const temp = document.getElementById('selectTemporadaCarrera').value;
+      const rally = document.getElementById('selectRallyCarrera').value;
+      const keyInscritos = `${temp}_${rally}`;
+
+      db.inscritos[keyInscritos] = db.inscritos[keyInscritos].filter(id => id !== pilotoId);
+      guardarDB();
+      cargarFormularioCargaRally();
+    }
+
+    function renderizarInputsPilotosInscritos(keyInscritos) {
+      ordenarPilotosPorClase();
+      const inscritosIds = db.inscritos[keyInscritos] || [];
+      const pilotosInscritos = db.pilotos.filter(p => inscritosIds.includes(p.id));
+      const inputsContainer = document.getElementById('inputsTiemposPilotos');
+      const resultadoPrevio = db.resultados[keyInscritos];
+
+      if (pilotosInscritos.length === 0) {
+        inputsContainer.innerHTML = "<p style='color:var(--gold);'>No hay participantes inscriptos para este rally. Añade uno arriba.</p>";
+        return;
+      }
+
+      const cfgEtapas = db.configEtapas[keyInscritos] || { total: 12, sunday: 3 };
+      const total = cfgEtapas.total;
+      const sunday = cfgEtapas.sunday;
+      const sundayStart = total - sunday;
+
+      inputsContainer.innerHTML = pilotosInscritos.map(piloto => {
+        let t = {};
+        let pen = {};
+
+        if (resultadoPrevio) {
+          const prev = resultadoPrevio.find(r => r.nombre === piloto.nombre);
+          if (prev && prev.tiemposInput) {
+            t = prev.tiemposInput;
+            pen = prev.penalizacionesInput || {};
+          }
+        }
+
+        let etapasHTML = '';
+        for (let i = 1; i <= total; i++) {
+          const keyEtapa = `e${i}`;
+          const valTiempo = t[keyEtapa] || "";
+          const valPen = pen[keyEtapa] || "0";
+
+          let labelEtapa = `Etapa ${i}`;
+          let cardClass = "etapa-card";
+
+          if (i === total) {
+            labelEtapa = `SS${i} (Power Stage)`;
+            cardClass += " is-ps";
+          } else if (i >= sundayStart) {
+            labelEtapa = `SS${i} (Sunday)`;
+            cardClass += " is-sunday";
+          }
+
+          etapasHTML += `
+            <div class="${cardClass}" id="card_${keyEtapa}_${piloto.id}">
+              <label>${labelEtapa}</label>
+              <input type="text" id="${keyEtapa}_${piloto.id}" value="${valTiempo}" placeholder="MM:SS.sss" oninput="aplicarMascaraTiempo(this); evaluarManejoDNF(${piloto.id}, ${total});">
+              <select id="pen_${keyEtapa}_${piloto.id}" onchange="evaluarManejoDNF(${piloto.id}, ${total});">
+                <option value="0" ${valPen === '0' ? 'selected' : ''}>Sin Pen.</option>
+                <option value="1" ${valPen === '1' ? 'selected' : ''}>Penalización 1</option>
+                <option value="2" ${valPen === '2' ? 'selected' : ''}>Penalización 2</option>
+              </select>
+            </div>
+          `;
+        }
+
+        return `
+          <div style="border-bottom: 1px solid var(--border); padding: 15px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+              <div>
+                <span class="badge-flag">${piloto.pais}</span>
+                <strong>${piloto.nombre}</strong> 
+                <span class="badge-cat">${piloto.categoria}</span>
+              </div>
+              <button class="btn-danger" style="padding:4px 8px; font-size:0.8em;" onclick="removerPilotoDeRally(${piloto.id})">Quitar del Rally</button>
+            </div>
+            <div class="etapa-inputs">${etapasHTML}</div>
+          </div>
+        `;
+      }).join('');
+
+      pilotosInscritos.forEach(piloto => evaluarManejoDNF(piloto.id, total));
+    }
+
+    function evaluarManejoDNF(pilotoId, total) {
+      const temp = document.getElementById('selectTemporadaCarrera').value;
+      const cfgRules = getConfigTemporadaOrDefault(temp);
+
+      if (cfgRules.penVacioTipo !== 'DNF') return;
+
+      let dnfEncontrado = false;
+      for (let i = 1; i <= total; i++) {
+        const keyEtapa = `e${i}`;
+        const inputT = document.getElementById(`${keyEtapa}_${pilotoId}`);
+        const card = document.getElementById(`card_${keyEtapa}_${pilotoId}`);
+
+        if (!inputT || !card) continue;
+
+        if (dnfEncontrado) {
+          card.classList.add('is-disabled');
+          inputT.value = "";
+        } else {
+          card.classList.remove('is-disabled');
+          const str = inputT.value.trim();
+          const parsed = parseTiempo(str);
+          if (parsed === null) {
+            let etapaAlgunaPosteriorConTiempo = false;
+            for (let j = i + 1; j <= total; j++) {
+              const valPost = document.getElementById(`e${j}_${pilotoId}`)?.value;
+              if (parseTiempo(valPost) !== null) {
+                etapaAlgunaPosteriorConTiempo = true;
+                break;
+              }
+            }
+            if (!etapaAlgunaPosteriorConTiempo && str === "") {
+              dnfEncontrado = true;
+            }
+          }
+        }
+      }
+    }
+
+    function parseTiempo(str) {
+      if (!str || typeof str !== 'string') return null;
+      str = str.trim();
+      if (str === "" || str === "-" || str.toUpperCase() === "DNF") return null;
+
+      let digits = str.replace(/\D/g, '');
+      if (digits.length < 7) return null;
+
+      let m = parseFloat(digits.substring(0, 2));
+      let s = parseFloat(digits.substring(2, 4));
+      let ms = parseFloat(digits.substring(4, 7)) / 1000;
+
+      if (isNaN(m)) m = 0;
+      if (isNaN(s)) s = 0;
+      if (isNaN(ms)) ms = 0;
+
+      return (m * 60) + s + ms;
+    }
+
+    function formatTiempo(segundos, esOverall = false) {
+      if (segundos === null || isNaN(segundos) || segundos === 0) return "--:--.---";
+
+      if (esOverall && segundos >= 3600) {
+        const h = Math.floor(segundos / 3600);
+        const restoSeg = segundos % 3600;
+        const m = Math.floor(restoSeg / 60);
+        const s = Math.floor(restoSeg % 60);
+        const msFirstDigit = Math.floor((restoSeg % 1) * 10);
+
+        const mmStr = m < 10 ? `0${m}` : `${m}`;
+        const ssStr = s < 10 ? `0${s}` : `${s}`;
+
+        return `${h}:${mmStr}:${ssStr}.${msFirstDigit}`;
+      } else {
+        const m = Math.floor(segundos / 60);
+        const s = (segundos % 60).toFixed(3);
+        const mmStr = m < 10 ? `0${m}` : `${m}`;
+        const ssStr = parseFloat(s) < 10 ? `0${s}` : `${s}`;
+
+        return `${mmStr}:${ssStr}`;
+      }
+    }
+
+    function formatDiferencia(segundos, esOverall = false) {
+      if (segundos === 0) return "00:00.000";
+      if (segundos === null || isNaN(segundos)) return "-";
+      return `+${formatTiempo(segundos, esOverall)}`;
+    }
+
+    function procesarRally() {
+      const temp = document.getElementById('selectTemporadaCarrera').value;
+      const rally = document.getElementById('selectRallyCarrera').value;
+      const keyRally = `${temp}_${rally}`;
+      const inscritosIds = db.inscritos[keyRally] || [];
+      const pilotosInscritos = db.pilotos.filter(p => inscritosIds.includes(p.id));
+
+      if (pilotosInscritos.length === 0) return alert("Inscribe al menos un piloto.");
+
+      const cfgEtapas = db.configEtapas[keyRally] || { total: 12, sunday: 3 };
+      const total = cfgEtapas.total;
+      const sunday = cfgEtapas.sunday;
+      const sundayStart = total - sunday;
+
+      const cfgRules = getConfigTemporadaOrDefault(temp);
+
+      let datosRaw = [];
+
+      pilotosInscritos.forEach(piloto => {
+        let tiemposInput = {};
+        let penalizacionesInput = {};
+        let tiemposParsed = {};
+
+        for (let i = 1; i <= total; i++) {
+          const keyEtapa = `e${i}`;
+          tiemposInput[keyEtapa] = document.getElementById(`${keyEtapa}_${piloto.id}`).value;
+          penalizacionesInput[keyEtapa] = document.getElementById(`pen_${keyEtapa}_${piloto.id}`).value;
+          tiemposParsed[keyEtapa] = parseTiempo(tiemposInput[keyEtapa]);
+        }
+
+        datosRaw.push({
+          piloto,
+          tiemposInput,
+          penalizacionesInput,
+          tiemposParsed
+        });
+      });
+
+      let peoresTiemposPorEtapa = {};
+      let etapaDisputada = {};
+
+      for (let i = 1; i <= total; i++) {
+        const keyEtapa = `e${i}`;
+        let tiemposValidos = datosRaw.map(d => d.tiemposParsed[keyEtapa]).filter(t => t !== null);
+        
+        if (tiemposValidos.length > 0) {
+          etapaDisputada[keyEtapa] = true;
+          peoresTiemposPorEtapa[keyEtapa] = Math.max(...tiemposValidos);
+        } else {
+          etapaDisputada[keyEtapa] = false;
+          peoresTiemposPorEtapa[keyEtapa] = 0;
+        }
+      }
+
+      let sundayDisputado = false;
+      for (let i = sundayStart; i < total; i++) {
+        if (etapaDisputada[`e${i}`]) {
+          sundayDisputado = true;
+          break;
+        }
+      }
+      let powerStageDisputada = etapaDisputada[`e${total}`];
+      let rallyDisputadoOverall = Object.values(etapaDisputada).some(v => v === true);
+
+      let datosProcesados = datosRaw.map(item => {
+        let tiemposFinalesEtapas = {};
+        let sumaOverall = 0;
+        let sumaSunday = 0;
+        let esDNF = false;
+
+        for (let i = 1; i <= total; i++) {
+          const keyEtapa = `e${i}`;
+          let base = item.tiemposParsed[keyEtapa];
+          let penTipo = item.penalizacionesInput[keyEtapa];
+
+          if (esDNF) {
+            tiemposFinalesEtapas[keyEtapa] = null;
+            continue;
+          }
+
+          if (!etapaDisputada[keyEtapa]) {
+            base = 0;
+          } else {
+            if (penTipo === "1") {
+              let tBase = (cfgRules.pen1Base === 'PEOR') ? peoresTiemposPorEtapa[keyEtapa] : (base || peoresTiemposPorEtapa[keyEtapa]);
+              base = tBase + (cfgRules.pen1Minutos * 60);
+            } else if (penTipo === "2") {
+              let tBase = (cfgRules.pen2Base === 'PEOR') ? peoresTiemposPorEtapa[keyEtapa] : (base || peoresTiemposPorEtapa[keyEtapa]);
+              base = tBase + (cfgRules.pen2Minutos * 60);
+            } else if (base === null) {
+              if (cfgRules.penVacioTipo === 'DNF') {
+                esDNF = true;
+                tiemposFinalesEtapas[keyEtapa] = null;
+                continue;
+              } else {
+                base = peoresTiemposPorEtapa[keyEtapa] + 300;
+              }
+            }
+          }
+
+          tiemposFinalesEtapas[keyEtapa] = base;
+          sumaOverall += base;
+
+          if (i >= sundayStart && i < total) {
+            sumaSunday += base;
+          }
+        }
+
+        return {
+          nombre: item.piloto.nombre,
+          pais: item.piloto.pais,
+          categoria: item.piloto.categoria,
+          tiemposInput: item.tiemposInput,
+          penalizacionesInput: item.penalizacionesInput,
+          tiemposFinalesEtapas,
+          tiempoTotalOverall: esDNF ? null : sumaOverall,
+          tiempoSuperSunday: esDNF ? null : sumaSunday,
+          tiempoPowerStage: esDNF ? null : tiemposFinalesEtapas[`e${total}`],
+          esDNF,
+          ptsOverall: 0,
+          ptsSuperSunday: 0,
+          ptsPowerStage: 0,
+          ptsTotalRally: 0
+        };
+      });
+
+      const ptsOverallArr = cfgRules.ptsOverall || DEFAULT_PTS_OVERALL;
+      const ptsSundayArr = cfgRules.ptsSunday || DEFAULT_PTS_SUPER_SUNDAY;
+      const ptsPSArr = cfgRules.ptsPowerStage || DEFAULT_PTS_POWER_STAGE;
+
+      if (rallyDisputadoOverall) {
+        let clasifOverall = datosProcesados.filter(d => !d.esDNF && d.tiempoTotalOverall > 0).sort((a, b) => a.tiempoTotalOverall - b.tiempoTotalOverall);
+        clasifOverall.forEach((item, index) => {
+          if (index < ptsOverallArr.length) item.ptsOverall = ptsOverallArr[index];
+        });
+      }
+
+      if (sundayDisputado) {
+        let clasifSunday = datosProcesados.filter(d => !d.esDNF && d.tiempoSuperSunday > 0).sort((a, b) => a.tiempoSuperSunday - b.tiempoSuperSunday);
+        clasifSunday.forEach((item, index) => {
+          if (index < ptsSundayArr.length) item.ptsSuperSunday = ptsSundayArr[index];
+        });
+      }
+
+      if (powerStageDisputada) {
+        let clasifPS = datosProcesados.filter(d => !d.esDNF && d.tiempoPowerStage > 0).sort((a, b) => a.tiempoPowerStage - b.tiempoPowerStage);
+        clasifPS.forEach((item, index) => {
+          if (index < ptsPSArr.length) item.ptsPowerStage = ptsPSArr[index];
+        });
+      }
+
+      datosProcesados.forEach(item => {
+        item.ptsTotalRally = item.ptsOverall + item.ptsSuperSunday + item.ptsPowerStage;
+      });
+
+      datosProcesados.sort((a, b) => {
+        if (a.esDNF && !b.esDNF) return 1;
+        if (!a.esDNF && b.esDNF) return -1;
+        if (a.esDNF && b.esDNF) return 0;
+        return a.tiempoTotalOverall - b.tiempoTotalOverall;
+      });
+
+      db.resultados[keyRally] = datosProcesados;
+      guardarDB();
+
+      renderizarResultadosRally(datosProcesados, temp);
+    }
+
+    function renderizarResultadosRally(resultados, temp) {
+      const contenedor = document.getElementById('contenedorResultadosRally');
+      const tbody = document.querySelector('#tablaResultadosRally tbody');
+      
+      contenedor.style.display = "block";
+      const ganadores = resultados.filter(r => !r.esDNF);
+      const tiempoGanador = ganadores.length > 0 ? ganadores[0].tiempoTotalOverall : 0;
+
+      tbody.innerHTML = resultados.map((r, i) => {
+        if (r.esDNF) {
+          return `
+            <tr>
+              <td><strong>DNF</strong></td>
+              <td><span class="badge-flag">${r.pais}</span> ${r.nombre}</td>
+              <td><span class="badge-cat">${r.categoria}</span></td>
+              <td style="color:var(--danger); font-weight:bold;">DNF</td>
+              <td>-</td>
+              <td>-</td>
+              <td>0 pts</td>
+              <td>0 pts</td>
+              <td>0 pts</td>
+              <td class="pts-highlight">0 pts</td>
+            </tr>
+          `;
+        }
+
+        const diff = r.tiempoTotalOverall - tiempoGanador;
+        return `
+          <tr>
+            <td><strong>${i + 1}°</strong></td>
+            <td><span class="badge-flag">${r.pais}</span> ${r.nombre}</td>
+            <td><span class="badge-cat">${r.categoria}</span></td>
+            <td>${formatTiempo(r.tiempoTotalOverall, true)}</td>
+            <td>${formatDiferencia(diff, true)}</td>
+            <td>${formatTiempo(r.tiempoSuperSunday, false)}</td>
+            <td>${r.ptsOverall} pts</td>
+            <td>${r.ptsSuperSunday} pts</td>
+            <td>${r.ptsPowerStage} pts</td>
+            <td class="pts-highlight">${r.ptsTotalRally} pts</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // --- CAMPEONATO GENERAL ---
+    function actualizarSelectsCampeonato() {
+      const selectTemp = document.getElementById('selectTempCampeonato');
+      selectTemp.innerHTML = '<option value="">-- Selecciona Temporada --</option>' + 
+        Object.keys(db.temporadas).map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+
+    function calcularPuntosTemporada(temp, catFiltro = 'ALL') {
+      const ralliesDeTemp = db.temporadas[temp] || [];
+      const cfgRules = getConfigTemporadaOrDefault(temp);
+      const ptsOverallArr = cfgRules.ptsOverall || DEFAULT_PTS_OVERALL;
+      const ptsSundayArr = cfgRules.ptsSunday || DEFAULT_PTS_SUPER_SUNDAY;
+      const ptsPSArr = cfgRules.ptsPowerStage || DEFAULT_PTS_POWER_STAGE;
+
+      let acumuladoPilotos = {};
+
+      const pilotosAProcesar = catFiltro === 'ALL' 
+        ? db.pilotos 
+        : db.pilotos.filter(p => p.categoria === catFiltro);
+
+      pilotosAProcesar.forEach(p => {
+        let puntosPorRally = {};
+        ralliesDeTemp.forEach(r => puntosPorRally[r] = 0);
+
+        acumuladoPilotos[p.nombre] = {
+          nombre: p.nombre,
+          pais: p.pais,
+          categoria: p.categoria,
+          ptsRallies: puntosPorRally,
+          ptsTotal: 0
+        };
+      });
+
+      ralliesDeTemp.forEach(rally => {
+        const key = `${temp}_${rally}`;
+        const res = db.resultados[key];
+
+        if (res) {
+          if (catFiltro === 'ALL') {
+            res.forEach(p => {
+              if (acumuladoPilotos[p.nombre]) {
+                acumuladoPilotos[p.nombre].ptsRallies[rally] = p.ptsTotalRally;
+              }
+            });
+          } else {
+            const resCat = res.filter(r => r.categoria === catFiltro && !r.esDNF);
+            let puntosProcesadosRally = {};
+            resCat.forEach(r => puntosProcesadosRally[r.nombre] = 0);
+
+            resCat.sort((a, b) => a.tiempoTotalOverall - b.tiempoTotalOverall);
+            resCat.forEach((item, idx) => {
+              if (idx < ptsOverallArr.length && item.tiempoTotalOverall > 0) puntosProcesadosRally[item.nombre] += ptsOverallArr[idx];
+            });
+
+            resCat.sort((a, b) => a.tiempoSuperSunday - b.tiempoSuperSunday);
+            resCat.forEach((item, idx) => {
+              if (idx < ptsSundayArr.length && item.tiempoSuperSunday > 0) puntosProcesadosRally[item.nombre] += ptsSundayArr[idx];
+            });
+
+            resCat.sort((a, b) => a.tiempoPowerStage - b.tiempoPowerStage);
+            resCat.forEach((item, idx) => {
+              if (idx < ptsPSArr.length && item.tiempoPowerStage > 0) puntosProcesadosRally[item.nombre] += ptsPSArr[idx];
+            });
+
+            Object.keys(puntosProcesadosRally).forEach(nombre => {
+              if (acumuladoPilotos[nombre]) {
+                acumuladoPilotos[nombre].ptsRallies[rally] = puntosProcesadosRally[nombre];
+              }
+            });
+          }
+        }
+      });
+
+      Object.values(acumuladoPilotos).forEach(p => {
+        p.ptsTotal = Object.values(p.ptsRallies).reduce((a, b) => a + b, 0);
+      });
+
+      return Object.values(acumuladoPilotos).sort((a, b) => b.ptsTotal - a.ptsTotal);
+    }
+
+    function renderizarCampeonato() {
+      const temp = document.getElementById('selectTempCampeonato').value;
+      const catFiltro = document.getElementById('selectCatCampeonato').value;
+      const thead = document.getElementById('theadCampeonato');
+      const tbody = document.getElementById('tablaCampeonato');
+
+      if (!temp) {
+        thead.innerHTML = '';
+        tbody.innerHTML = '<tr><td colspan="4">Selecciona una Temporada.</td></tr>';
+        return;
+      }
+
+      document.getElementById('pdfTituloCampeonato').innerText = `Tabla de Campeonato - ${temp} (${catFiltro})`;
+      const ralliesDeTemp = db.temporadas[temp] || [];
+
+      let thRalliesHTML = ralliesDeTemp.map(r => `<th style="text-align:center;">${r}</th>`).join('');
+      thead.innerHTML = `
+        <tr>
+          <th>Pos</th>
+          <th>Piloto</th>
+          <th>Clase</th>
+          ${thRalliesHTML}
+          <th>Total Pts</th>
+        </tr>
+      `;
+
+      const ranking = calcularPuntosTemporada(temp, catFiltro);
+
+      if (ranking.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${4 + ralliesDeTemp.length}">No hay datos grabados.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = ranking.map((p, i) => {
+        let colsRallies = ralliesDeTemp.map(r => `<td style="text-align:center;">${p.ptsRallies[r] || 0}</td>`).join('');
+        return `
+          <tr>
+            <td><strong>${i + 1}°</strong></td>
+            <td><span class="badge-flag">${p.pais}</span> ${p.nombre}</td>
+            <td><span class="badge-cat">${p.categoria}</span></td>
+            ${colsRallies}
+            <td class="pts-highlight" style="text-align:center;">${p.ptsTotal} pts</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // --- HISTORIAL & ESTADÍSTICAS ---
+    function renderizarEstadisticas() {
+      const catFiltro = document.getElementById('selectCatStats') ? document.getElementById('selectCatStats').value : 'ALL';
+      const criterioOrden = document.getElementById('selectOrdenStats') ? document.getElementById('selectOrdenStats').value : 'titulos';
+      
+      const divCampeones = document.getElementById('contenedorCampeones');
+      const tbodyStats = document.getElementById('tablaEstadisticas');
+
+      let campeonesHTML = "";
+      let statsPilotos = {};
+
+      db.pilotos.forEach(p => {
+        statsPilotos[p.nombre] = {
+          nombre: p.nombre,
+          pais: p.pais,
+          categoria: p.categoria,
+          titulos: 0,
+          ralliesGanados: 0,
+          etapasGanadas: 0,
+          sundayGanados: 0,
+          powerStageGanadas: 0
+        };
+      });
+
+      // 1. Evaluar Campeones
+      Object.keys(db.temporadas).forEach(temp => {
+        const ralliesTemp = db.temporadas[temp];
+        const totalmenteDisputada = ralliesTemp.length > 0 && ralliesTemp.every(r => db.resultados[`${temp}_${r}`] && db.resultados[`${temp}_${r}`].length > 0);
+
+        if (totalmenteDisputada) {
+          const rankingFinal = calcularPuntosTemporada(temp, catFiltro);
+          if (rankingFinal.length > 0) {
+            const campeon = rankingFinal[0];
+            if (statsPilotos[campeon.nombre]) {
+              statsPilotos[campeon.nombre].titulos++;
+            }
+            campeonesHTML += `
+              <div class="card-campeon">
+                <small style="color:var(--accent-color); font-weight:bold;">${temp} (${catFiltro})</small>
+                <div style="font-size: 1.1em; margin-top: 4px;">
+                  🏆 <strong>${campeon.nombre}</strong> <span class="badge-flag">${campeon.pais}</span>
+                </div>
+                <small style="color:#94a3b8;">Clase: ${campeon.categoria} | Puntos: ${campeon.ptsTotal}</small>
+              </div>
+            `;
+          }
+        }
+      });
+
+      if (!campeonesHTML) {
+        divCampeones.innerHTML = "<p style='color:#94a3b8;'>Aún no hay temporadas finalizadas completas. Al cargar el 100% de los rallies de una temporada se proclamará al campeón.</p>";
+      } else {
+        divCampeones.innerHTML = campeonesHTML;
+      }
+
+      // 2. Procesar Victorias
+      Object.keys(db.resultados).forEach(keyRally => {
+        const tempNombre = keyRally.split('_')[0];
+        if (!db.temporadas[tempNombre]) return;
+
+        let resRally = db.resultados[keyRally];
+        if (!resRally || resRally.length === 0) return;
+
+        if (catFiltro !== 'ALL') {
+          resRally = resRally.filter(p => p.categoria === catFiltro);
+        }
+
+        const clasificadosSinDNF = resRally.filter(p => !p.esDNF);
+        if (clasificadosSinDNF.length === 0) return;
+
+        const cfgEtapas = db.configEtapas[keyRally] || { total: 12, sunday: 3 };
+
+        let copiaOverall = [...clasificadosSinDNF].sort((a, b) => a.tiempoTotalOverall - b.tiempoTotalOverall);
+        if (copiaOverall[0] && copiaOverall[0].tiempoTotalOverall > 0 && statsPilotos[copiaOverall[0].nombre]) {
+          statsPilotos[copiaOverall[0].nombre].ralliesGanados++;
+        }
+
+        let copiaSunday = [...clasificadosSinDNF].sort((a, b) => a.tiempoSuperSunday - b.tiempoSuperSunday);
+        if (copiaSunday[0] && copiaSunday[0].tiempoSuperSunday > 0 && statsPilotos[copiaSunday[0].nombre]) {
+          statsPilotos[copiaSunday[0].nombre].sundayGanados++;
+        }
+
+        let copiaPS = [...clasificadosSinDNF].sort((a, b) => a.tiempoPowerStage - b.tiempoPowerStage);
+        if (copiaPS[0] && copiaPS[0].tiempoPowerStage > 0 && statsPilotos[copiaPS[0].nombre]) {
+          statsPilotos[copiaPS[0].nombre].powerStageGanadas++;
+        }
+
+        for (let i = 1; i <= cfgEtapas.total; i++) {
+          const keyEtapa = `e${i}`;
+          let mejorTiempo = Infinity;
+          let ganadorEtapa = null;
+
+          clasificadosSinDNF.forEach(piloto => {
+            if (piloto.tiemposFinalesEtapas && piloto.tiemposFinalesEtapas[keyEtapa]) {
+              const t = piloto.tiemposFinalesEtapas[keyEtapa];
+              if (t > 0 && t < mejorTiempo) {
+                mejorTiempo = t;
+                ganadorEtapa = piloto.nombre;
+              }
+            }
+          });
+
+          if (ganadorEtapa && statsPilotos[ganadorEtapa]) {
+            statsPilotos[ganadorEtapa].etapasGanadas++;
+          }
+        }
+      });
+
+      // 3. Renderizar y Ordenar Tabla de Stats
+      let listaStats = Object.values(statsPilotos);
+
+      if (catFiltro !== 'ALL') {
+        listaStats = listaStats.filter(p => p.categoria === catFiltro);
+      }
+
+      listaStats.sort((a, b) => {
+        if (b[criterioOrden] !== a[criterioOrden]) {
+          return b[criterioOrden] - a[criterioOrden];
+        }
+        if (b.ralliesGanados !== a.ralliesGanados) return b.ralliesGanados - a.ralliesGanados;
+        return b.titulos - a.titulos;
+      });
+
+      tbodyStats.innerHTML = listaStats.map(p => `
+        <tr>
+          <td style="text-align:left;"><span class="badge-flag">${p.pais}</span> <strong>${p.nombre}</strong></td>
+          <td><span class="badge-cat">${p.categoria}</span></td>
+          <td class="${criterioOrden === 'titulos' ? 'pts-highlight' : ''}">${p.titulos}</td>
+          <td class="${criterioOrden === 'ralliesGanados' ? 'pts-highlight' : ''}">${p.ralliesGanados}</td>
+          <td class="${criterioOrden === 'etapasGanadas' ? 'pts-highlight' : ''}">${p.etapasGanadas}</td>
+          <td class="${criterioOrden === 'sundayGanados' ? 'pts-highlight' : ''}">${p.sundayGanados}</td>
+          <td class="${criterioOrden === 'powerStageGanadas' ? 'pts-highlight' : ''}">${p.powerStageGanadas}</td>
+        </tr>
+      `).join('');
+    }
+
+    // EXPORTACIÓN A PDF
+    function exportarPDF(elementId, nombreArchivo) {
+      const elemento = document.getElementById(elementId);
+      const contenedorPadre = elemento.parentElement;
+
+      const displayOriginalPadre = contenedorPadre.style.display;
+      contenedorPadre.style.display = "block";
+
+      const opciones = {
+        margin:       5,
+        filename:     `${nombreArchivo}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+          scale: 2, 
+          backgroundColor: '#1e293b',
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opciones).from(elemento).save().then(() => {
+        contenedorPadre.style.display = displayOriginalPadre;
+      });
+    }
+
+    // Inicializar
+    renderizarPilotos();
+    renderizarRallies();
+  </script>
+</body>
+</html>
